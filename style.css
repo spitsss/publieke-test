@@ -125,3 +125,53 @@ html {
   background-color: #4b4ac0;
   transform: translateY(-10px);
 }
+
+
+/* ----- Het menu ----- */
+
+/* Het menu is normaal niet te zien */
+.menu {
+  display: none;
+}
+
+/* Klik je op Start, dan staat #menu in de adresbalk en verschijnt het menu */
+.menu:target {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #23226b;
+  text-align: center;
+  padding-top: 120px;
+}
+
+.menu h2 {
+  color: white;
+  font-family: Arial;
+  font-size: 30px;
+  margin-bottom: 50px;
+}
+
+/* De keuzes in het menu */
+.menu a {
+  display: block;
+  margin-top: 25px;
+  color: white;
+  font-family: Arial;
+  font-size: 22px;
+  text-decoration: none;
+  transition: 0.3s;
+}
+
+.menu a:hover {
+  color: #cfceff;
+}
+
+/* De sluitknop iets kleiner en grijzer */
+.menu .sluiten {
+  margin-top: 60px;
+  font-size: 16px;
+  color: #b0b0d0;
+}
