@@ -175,3 +175,24 @@ html {
   font-size: 16px;
   color: #b0b0d0;
 }
+
+
+/* ----- De knop onderaan ----- */
+
+/* Brengt je terug naar de bovenkant van de pagina */
+.omhoog {
+  display: inline-block;
+  margin-top: 60px;
+  background-color: white;
+  color: darkblue;
+  padding: 15px 40px;
+  border-radius: 25px;
+  text-decoration: none;
+  font-weight: bold;
+  transition: 0.3s;
+}
+
+.omhoog:hover {
+  background-color: #cfceff;
+  transform: translateY(-5px);
+}
