@@ -28,176 +28,66 @@ body, html {
 }
 
 
-/* ==================================================================
-   VANAF HIER NIEUW: de opmaak voor de secties eronder
-   ================================================================== */
+/* ----- Hieronder de opmaak van de delen eronder ----- */
 
-* {
-  box-sizing: border-box;
+/* De witte rand om de pagina weghalen */
+body {
+  margin: 0;
 }
 
+/* De pagina rustig laten scrollen */
 html {
-  /* Zorgt dat de Start-knop soepel naar beneden scrollt */
   scroll-behavior: smooth;
 }
 
-body {
-  margin: 0;
-  font-family: Arial, Helvetica, sans-serif;
-  color: white;
-  background-color: #23226b;
-}
-
-h1, h2, h3 {
-  font-family: Georgia, "Times New Roman", serif;
-  margin: 0;
-}
-
-
-/* ===== De hero een beetje opmaken ===== */
-
-.hero-text {
-  width: 90%;
-}
-
-.hero-text h1 {
-  font-size: 56px;
-}
-
-.hero-text p {
-  font-size: 20px;
-  margin: 10px 0 30px;
-}
-
-.hero-text button {
-  padding: 14px 40px;
-  border: none;
-  border-radius: 999px;
+/* De Start knop */
+.start {
+  display: inline-block;
+  margin-top: 20px;
   background-color: white;
-  color: #23226b;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 16px;
+  color: darkblue;
+  padding: 15px 40px;
+  border-radius: 25px;
+  text-decoration: none;
   font-weight: bold;
-  cursor: pointer;
 }
 
-.hero-text button:hover {
-  background-color: #cfceff;
-}
-
-
-/* ===== De secties ===== */
-
-.sectie {
-  min-height: 100vh;          /* elke sectie is minstens een heel scherm hoog */
-  display: flex;              /* flexbox om de inhoud te centreren */
-  align-items: center;
-  justify-content: center;
-  padding: 80px 20px;
+/* Elk deel van de pagina */
+.deel {
+  padding: 100px 20px;
   text-align: center;
+  color: white;
+  font-family: Arial;
 }
 
-/* Twee kleuren die elkaar afwisselen */
-.sectie-donker {
+/* De twee kleuren die elkaar afwisselen */
+.blauw {
   background-color: #23226b;
 }
 
-.sectie-licht {
+.paars {
   background-color: #322f9c;
 }
 
-.inhoud {
-  max-width: 800px;
-  width: 100%;
-}
-
-/* Het kleine nummertje boven de kop, bijvoorbeeld "01 - Persoonlijk" */
-.label {
-  text-transform: uppercase;
-  letter-spacing: 3px;
-  font-size: 13px;
-  opacity: 0.7;
-  margin: 0 0 12px;
-}
-
-.sectie h2 {
-  font-size: 40px;
-  margin-bottom: 30px;
-}
-
-.tussenkop {
-  font-size: 24px;
-  margin: 40px 0 15px;
-}
-
-.tekst {
-  font-size: 18px;
-  line-height: 1.7;
-  margin: 0;
-}
-
-/* Grote naam, bijvoorbeeld de artiest */
-.groot {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 48px;
-  margin: 0 0 20px;
-}
-
-/* Klein balkje met een datum of een nummer erin */
-.pill {
+/* De blokjes bij mijn hobby's */
+.blokje {
   display: inline-block;
-  background-color: rgba(255, 255, 255, 0.15);
-  border-radius: 999px;
-  padding: 10px 24px;
-  margin: 0 0 30px;
-  font-size: 16px;
+  width: 250px;
+  background-color: #35349c;
+  padding: 20px;
+  margin: 10px;
+  border-radius: 10px;
 }
 
-
-/* ===== De kaartjes (hobby's en opleiding) ===== */
-
-.kaarten {
-  display: flex;
-  flex-wrap: wrap;            /* onder elkaar op een klein scherm */
-  gap: 20px;
-  justify-content: center;
-}
-
-.kaart {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 30px;
-  flex: 1 1 250px;
-  max-width: 320px;
-}
-
-.kaart h3 {
-  font-size: 22px;
-  margin-bottom: 10px;
-}
-
-.kaart p {
-  margin: 5px 0;
+/* De lange stukken tekst niet te breed maken */
+.tekst {
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
   line-height: 1.6;
 }
 
-
-/* ===== Kleine schermen (telefoon) ===== */
-
-@media (max-width: 600px) {
-  .hero-text h1 {
-    font-size: 36px;
-  }
-
-  .sectie h2 {
-    font-size: 28px;
-  }
-
-  .groot {
-    font-size: 34px;
-  }
-
-  .tekst {
-    font-size: 16px;
-  }
+/* Een grote naam, zoals van de artiest */
+.groot {
+  font-size: 40px;
 }
