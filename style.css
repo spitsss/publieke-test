@@ -73,7 +73,9 @@ html {
 .blokje {
   display: inline-block;
   vertical-align: top;
+  box-sizing: border-box;
   width: 250px;
+  min-height: 190px;
   background-color: rgba(255, 255, 255, 0.15);
   padding: 20px;
   margin: 10px;
@@ -100,7 +102,7 @@ html {
 
 /* Een grote naam, zoals van de artiest */
 .groot {
-  font-size: 40px;
+  font-size: 32px;
 }
 
 
