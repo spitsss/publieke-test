@@ -1,0 +1,195 @@
+/* ===== Basis ===== */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  /* Zorgt dat de Start-knop soepel naar beneden scrollt */
+  scroll-behavior: smooth;
+}
+
+body, html {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  color: white;
+  background-color: #23226b;
+}
+
+h1, h2, h3 {
+  font-family: Georgia, "Times New Roman", serif;
+  margin: 0;
+}
+
+
+/* ===== Sectie 1: de hero ===== */
+
+.hero-image {
+  /* "linear-gradient" maakt de foto donkerder zodat de tekst leesbaar blijft */
+  background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url("ChatGPT Image 10 sep 2026, 15_30_21.png");
+
+  /* Vaste hoogte: het hele scherm */
+  height: 100%;
+
+  /* De foto netjes centreren op elk scherm */
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  position: relative;
+}
+
+/* De tekst in het midden van de foto */
+.hero-text {
+  text-align: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  width: 90%;
+}
+
+.hero-text h1 {
+  font-size: 56px;
+}
+
+.hero-text p {
+  font-size: 20px;
+  margin: 10px 0 30px;
+}
+
+/* De Start-knop is een link, zo kan hij naar sectie 1 scrollen */
+.start-knop {
+  display: inline-block;
+  padding: 14px 40px;
+  background-color: white;
+  color: #23226b;
+  text-decoration: none;
+  font-weight: bold;
+  border-radius: 999px;
+}
+
+.start-knop:hover {
+  background-color: #cfceff;
+}
+
+
+/* ===== De secties eronder ===== */
+
+.sectie {
+  min-height: 100vh;          /* elke sectie is minstens een heel scherm hoog */
+  display: flex;              /* flexbox om de inhoud te centreren */
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  text-align: center;
+}
+
+/* Twee kleuren die elkaar afwisselen */
+.sectie-donker {
+  background-color: #23226b;
+}
+
+.sectie-licht {
+  background-color: #322f9c;
+}
+
+.inhoud {
+  max-width: 800px;
+  width: 100%;
+}
+
+/* Het kleine nummertje boven de kop, bijvoorbeeld "01 - Persoonlijk" */
+.label {
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  font-size: 13px;
+  opacity: 0.7;
+  margin: 0 0 12px;
+}
+
+.sectie h2 {
+  font-size: 40px;
+  margin-bottom: 30px;
+}
+
+.tussenkop {
+  font-size: 24px;
+  margin: 40px 0 15px;
+}
+
+.tekst {
+  font-size: 18px;
+  line-height: 1.7;
+  margin: 0;
+}
+
+/* Grote naam, bijvoorbeeld de artiest */
+.groot {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 48px;
+  margin: 0 0 20px;
+}
+
+/* Klein balkje met een datum of een nummer erin */
+.pill {
+  display: inline-block;
+  background-color: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  padding: 10px 24px;
+  margin: 0 0 30px;
+  font-size: 16px;
+}
+
+
+/* ===== De kaartjes (hobby's en opleiding) ===== */
+
+.kaarten {
+  display: flex;
+  flex-wrap: wrap;            /* onder elkaar op een klein scherm */
+  gap: 20px;
+  justify-content: center;
+}
+
+.kaart {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 30px;
+  flex: 1 1 250px;
+  max-width: 320px;
+}
+
+.kaart h3 {
+  font-size: 22px;
+  margin-bottom: 10px;
+}
+
+.kaart p {
+  margin: 5px 0;
+  line-height: 1.6;
+}
+
+
+/* ===== Kleine schermen (telefoon) ===== */
+
+@media (max-width: 600px) {
+  .hero-text h1 {
+    font-size: 36px;
+  }
+
+  .sectie h2 {
+    font-size: 28px;
+  }
+
+  .groot {
+    font-size: 34px;
+  }
+
+  .tekst {
+    font-size: 16px;
+  }
+}
