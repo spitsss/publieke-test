@@ -91,3 +91,37 @@ html {
 .groot {
   font-size: 40px;
 }
+
+
+/* ----- De animaties ----- */
+
+/* Animatie 1: de tekst op de foto komt langzaam tevoorschijn */
+@keyframes tevoorschijn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.hero-text {
+  animation: tevoorschijn 2s;
+}
+
+/* Animatie 2 en 3 gaan langzaam in plaats van meteen */
+.start, .blokje {
+  transition: 0.3s;
+}
+
+/* Animatie 2: de Start knop wordt groter als je erover gaat */
+.start:hover {
+  background-color: #cfceff;
+  transform: scale(1.1);
+}
+
+/* Animatie 3: een blokje gaat omhoog als je erover gaat */
+.blokje:hover {
+  background-color: #4b4ac0;
+  transform: translateY(-10px);
+}
