@@ -1,0 +1,3 @@
+# Alleen deze twee zijn echt nodig.
+telethon==1.36.0   # praat met BasedBot via je eigen Telegram-account
+requests==2.32.3   # Dexscreener, Blockscout en de bedieningsbot

@@ -1,0 +1,140 @@
+# ============================================================================
+#  CA-sniper — instellingen
+#
+#  Kopieer dit bestand naar config.ini en vul het in:
+#      cp config.ini.voorbeeld config.ini
+#
+#  config.ini staat in .gitignore: je sleutels komen dus nooit in git terecht.
+#  Sla het op als UTF-8. Een onzichtbaar BOM-teken vangen we op, maar netjes
+#  opslaan blijft beter.
+# ============================================================================
+
+[algemeen]
+# DRY RUN STAAT STANDAARD AAN: hij schrijft op wat hij zou kopen en koopt niets.
+# Zet dit pas op 'nee' als je met eigen ogen hebt gezien dat de keten klopt.
+dryrun = ja
+
+# INFO is normaal. DEBUG laat elke melding zien (handig bij het instellen).
+logniveau = INFO
+
+# Op deze poort claimt de sniper "ik ben de enige". Twee snipers tegelijk
+# sturen hetzelfde adres twee keer door.
+instantie_poort = 47611
+
+
+[meldingen]
+# auto = zoek zelf het juiste pad:
+#   Sequoia (15) en nieuwer : ~/Library/Group Containers/group.com.apple.usernoted/db2/db
+#   Sonoma (14) en ouder    : $(getconf DARWIN_USER_DIR)/com.apple.notificationcenter/db2/db
+db_pad = auto
+
+# Van welke app(s) kijken we de meldingen? Discord is com.hnc.Discord.
+# BEVESTIG dit met:  python3 meldingen.py --apps
+# (Canary of PTB hebben een andere naam.)
+bundle_ids = com.hnc.Discord
+
+# Hoe vaak kijken we in de database, in milliseconden. 100-200 is normaal.
+poll_ms = 150
+
+# auto = probeer 'ro', dan 'nolock', dan 'immutable'.
+# Zie de uitleg boven in meldingen.py: met 'immutable' kan SQLite nieuwe
+# meldingen missen als de database in WAL-stand staat. Laat dit op auto.
+leesmodus = auto
+
+
+[filter]
+# VERPLICHT. Zonder kanaalfilter reageert de bot op ELKE melding — ook op een
+# privébericht van een vriend die toevallig een adres plakt.
+#
+# Je mag meerdere regels gebruiken (inspringen!). Schrijf de kanaalnaam
+# ZONDER hekje — een ingesprongen regel die met # begint wordt namelijk als
+# commentaar gelezen en verdwijnt dan stilletjes.
+#
+#   microcaps-calls       precies dit kanaal (dus niet #microcaps-calls-vip)
+#   bevat:Alpha Group     alles waar dit in de titel staat: de hele server
+#   re:#(calls|alpha)     een eigen zoekpatroon, voor gevorderden
+kanalen =
+    microcaps-calls
+
+# Privéberichten meetellen? Standaard nee. Zet je dit aan, dan koopt de bot
+# ook op een adres dat iemand je privé stuurt.
+sta_dm_toe = nee
+
+# Berichten met een van deze woorden worden overgeslagen. Ze worden op HELE
+# woorden getoetst: "rug" matcht dus niet in "terug" of "brug".
+negeerwoorden = rug, rugpull, scam, honeypot, jeet, larp
+
+# Wat als er meerdere adressen in één melding staan?
+#   weiger = niets doen (je weet niet welke bedoeld wordt) -- aanbevolen
+#   eerste = neem de eerste
+meerdere_adressen = weiger
+
+
+[chains]
+# VRAAG 3 UIT DE OPDRACHT: op welke chain staat BasedBot nu?
+# Kies uit: solana, base, ethereum, bsc, arbitrum, polygon, avalanche, robinhood
+basedbot_chain = solana
+
+# Een 0x-adres ziet er op elke EVM-chain hetzelfde uit; BasedBot koopt op de
+# chain die actief staat.
+#   slim  onbekend token = verse launch, doorlaten; bekende mismatch = blokkeren
+#   warn  nooit blokkeren, wel waarschuwen
+#   off   helemaal niet opzoeken
+# 'slim' is de juiste keuze: op streng blokkeer je precies de verse launches.
+chaincontrole = slim
+
+# Harde limiet voor een Dexscreener-opzoeking. Langer wachten helpt niet:
+# bij een verse launch kent Dexscreener het token toch niet.
+dexscreener_limiet_ms = 1500
+
+
+[telegram]
+# VRAAG 4 UIT DE OPDRACHT. Haal deze twee op bij https://my.telegram.org
+# -> API development tools. Dit is je PERSOONLIJKE account, waarmee de bot
+# met BasedBot praat.
+api_id =
+api_hash =
+
+# Waar het sessiebestand komt te staan. KOPIEER DIT BESTAND NOOIT naar een
+# andere map of machine: twee clients met dezelfde sessie krijgen geen
+# updates meer, en dan lijkt alles te werken terwijl er niets binnenkomt.
+sessienaam = gegevens/sniper
+
+# De @naam van BasedBot. Praat er eerst één keer met de hand mee, anders
+# kan Telegram hem niet opzoeken.
+basedbot = @BasedBot
+
+# Hoe lang wachten we op antwoord voordat we het 'onbevestigd' noemen.
+antwoord_wacht_s = 12
+
+
+[handel]
+# VRAAG 5 UIT DE OPDRACHT: hoeveel per call?
+# VAST BEDRAG, met opzet geen percentage van je saldo. Bij 90% gaat alles in
+# de eerste coin die langskomt.
+bedrag = 0.05
+valuta = SOL
+
+# Zelf verkopen op signalen uit het kanaal. Standaard UIT.
+zelf_verkopen = nee
+
+
+[bediening]
+# Je eigen bot van @BotFather. Zet daar ook:
+#   /setjoingroups Disable
+#   /setinline     Disable
+#   /setprivacy    Enable
+bot_token =
+
+# JOUW Telegram-id (vraag het op bij @userinfobot). Alles van iemand anders
+# wordt geweigerd.
+toegestane_id =
+
+
+[dashboard]
+# Luistert alleen op 127.0.0.1.
+poort = 8787
+
+# Elke API-aanroep vereist deze sleutel. Laat je hem leeg, dan maakt
+# dashboard.py er zelf één en drukt die af.
+sleutel =

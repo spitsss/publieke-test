@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CA-sniper</title>
+<style>
+  :root{
+    --achtergrond:#12141a; --vlak:#1b1e26; --rand:#2a2f3a;
+    --tekst:#e8eaf0; --grijs:#98a0b3;
+    --groen:#3ddc84; --rood:#ff5c5c; --geel:#ffc65c; --blauw:#5cb3ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:24px 16px;background:var(--achtergrond);color:var(--tekst);
+       font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  .breed{max-width:1000px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px}
+  .onder{color:var(--grijs);font-size:13px;margin-bottom:20px}
+  .rooster{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px}
+  .kaart{background:var(--vlak);border:1px solid var(--rand);border-radius:10px;padding:14px}
+  .kaart .label{color:var(--grijs);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  .kaart .waarde{font-size:22px;font-weight:600;margin-top:6px}
+  .kaart .bij{color:var(--grijs);font-size:12px;margin-top:4px}
+  .groen{color:var(--groen)} .rood{color:var(--rood)} .geel{color:var(--geel)} .blauw{color:var(--blauw)}
+  .balk{padding:12px 14px;border-radius:10px;margin-bottom:14px;font-weight:600}
+  .balk.ok{background:rgba(61,220,132,.12);border:1px solid rgba(61,220,132,.4);color:var(--groen)}
+  .balk.fout{background:rgba(255,92,92,.12);border:1px solid rgba(255,92,92,.4);color:var(--rood)}
+  .balk.let{background:rgba(255,198,92,.12);border:1px solid rgba(255,198,92,.4);color:var(--geel)}
+  h2{font-size:15px;margin:22px 0 10px}
+  table{width:100%;border-collapse:collapse;background:var(--vlak);
+        border:1px solid var(--rand);border-radius:10px;overflow:hidden}
+  th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--rand);font-size:13px}
+  th{color:var(--grijs);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  tr:last-child td{border-bottom:none}
+  .adres{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+  pre{background:var(--vlak);border:1px solid var(--rand);border-radius:10px;padding:12px;
+      overflow:auto;max-height:320px;font-size:12px;color:var(--grijs);white-space:pre-wrap;word-break:break-word}
+  .uitleg{color:var(--grijs);font-size:12px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="breed">
+  <h1>CA-sniper</h1>
+  <div class="onder">Meldingen van de Discord-app → BasedBot. Ververst elke 3 seconden.</div>
+
+  <div id="balk"></div>
+  <div class="rooster" id="kaarten"></div>
+
+  <h2>Laatste calls</h2>
+  <table>
+    <thead><tr><th>Tijd</th><th>Adres</th><th>Resultaat</th><th>Snelheid</th><th>Uitleg</th></tr></thead>
+    <tbody id="handel"><tr><td colspan="5">laden…</td></tr></tbody>
+  </table>
+  <div class="uitleg">
+    <strong>Verstuurd is niet gekocht.</strong> "Verstuurd" betekent dat het adres de deur uit is.
+    "Gekocht" betekent dat BasedBot een aankoop heeft bevestigd. Staat er "onbevestigd",
+    dan is het adres wél verstuurd maar weet je niet of er iets gekocht is — controleer dan
+    eerst of Quick Buy aan staat.
+  </div>
+
+  <h2>Logboek</h2>
+  <pre id="log">laden…</pre>
+</div>
+
+<script>
+// De sleutel komt uit de link (?sleutel=...). Zonder sleutel doet de API niets.
+const sleutel = new URLSearchParams(location.search).get("sleutel") || "";
+
+async function haal(pad){
+  const antwoord = await fetch(pad + (pad.includes("?") ? "&" : "?") + "sleutel=" + encodeURIComponent(sleutel));
+  if(antwoord.status === 403) throw new Error("De sleutel klopt niet. Start dashboard.py en gebruik de link die hij afdrukt.");
+  if(!antwoord.ok) throw new Error("Het dashboard antwoordt niet (" + antwoord.status + ")");
+  return antwoord.json();
+}
+
+function kaart(label, waarde, kleur, bij){
+  return `<div class="kaart"><div class="label">${label}</div>
+          <div class="waarde ${kleur||""}">${waarde}</div>
+          ${bij ? `<div class="bij">${bij}</div>` : ""}</div>`;
+}
+
+function ontsnap(tekst){
+  return String(tekst ?? "").replace(/[&<>"]/g, t => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[t]));
+}
+
+async function ververs(){
+  try{
+    const s = await haal("/api/status");
+
+    let balk = "";
+    if(!s.draait){
+      balk = `<div class="balk fout">De sniper geeft geen teken van leven${
+        s.stilte_s !== null ? " (al " + s.stilte_s + " seconden stil)" : ""}. Draait bot.py nog?</div>`;
+    } else if(s.quickbuy === "uit"){
+      balk = `<div class="balk fout">QUICK BUY STAAT UIT — er wordt NIETS gekocht, ook al worden adressen doorgestuurd.</div>`;
+    } else if(s.gepauzeerd){
+      balk = `<div class="balk let">Gepauzeerd. De sniper reageert nergens op.</div>`;
+    } else if(s.dryrun){
+      balk = `<div class="balk let">DRY RUN — hij schrijft alleen op wat hij zou kopen.</div>`;
+    } else {
+      balk = `<div class="balk ok">Live en actief. Er wordt echt gekocht.</div>`;
+    }
+    document.getElementById("balk").innerHTML = balk;
+
+    const lopend = s.tellers_lopend || {}, boek = s.tellers_boek || {};
+    document.getElementById("kaarten").innerHTML =
+      kaart("Stand", s.dryrun ? "DRY RUN" : "LIVE", s.dryrun ? "geel" : "groen",
+            `${s.bedrag ?? "?"} ${s.valuta ?? ""} per call op ${s.chain ?? "?"}`) +
+      kaart("Bevestigd gekocht", boek.gekocht ?? 0, "groen", "BasedBot bevestigde de aankoop") +
+      kaart("Onbevestigd", boek.onbevestigd ?? 0, (boek.onbevestigd ? "geel" : ""), "wel verstuurd, geen bevestiging") +
+      kaart("Mislukt", boek.mislukt ?? 0, (boek.mislukt ? "rood" : ""), "BasedBot zei duidelijk nee") +
+      kaart("Geblokkeerd", boek.geblokkeerd ?? 0, "", "tegengehouden door de chaincontrole") +
+      kaart("Dry run", boek.dryrun ?? 0, "", "zou gekocht zijn") +
+      kaart("Snelheid", (s.laatste_ms ?? "?") + " ms", "blauw", "van melding tot verstuurd") +
+      kaart("Quick Buy", String(s.quickbuy || "?").toUpperCase(),
+            s.quickbuy === "aan" ? "groen" : (s.quickbuy === "uit" ? "rood" : "geel"),
+            ontsnap(s.quickbuy_uitleg)) +
+      kaart("Meldingen gezien", lopend.gezien ?? 0, "", `${lopend.gefilterd ?? 0} weggefilterd`) +
+      kaart("Schrijffouten", s.schrijffouten ?? 0, (s.schrijffouten ? "geel" : ""), "op het statusbestand");
+
+    const h = await haal("/api/handel?n=25");
+    const kleuren = {gekocht:"groen", mislukt:"rood", onbekend:"geel", dryrun:"", verstuurd:"blauw", geblokkeerd:"geel"};
+    const namen = {gekocht:"GEKOCHT", mislukt:"MISLUKT", onbekend:"onbevestigd", dryrun:"dry run", verstuurd:"verstuurd", geblokkeerd:"geblokkeerd"};
+    document.getElementById("handel").innerHTML = (h.regels || []).length
+      ? h.regels.map(r => `<tr>
+          <td>${ontsnap(r.tijd_leesbaar)}</td>
+          <td class="adres">${ontsnap(String(r.adres||"").slice(0,22))}…</td>
+          <td class="${kleuren[r.resultaat]||""}">${ontsnap(namen[r.resultaat]||r.resultaat)}</td>
+          <td>${r.ms != null ? ontsnap(r.ms)+" ms" : "—"}</td>
+          <td>${ontsnap(String(r.uitleg||"").slice(0,90))}</td></tr>`).join("")
+      : `<tr><td colspan="5">Nog geen calls verwerkt.</td></tr>`;
+
+    const l = await haal("/api/log?n=60");
+    const logvak = document.getElementById("log");
+    logvak.textContent = (l.regels || []).join("\n");
+    logvak.scrollTop = logvak.scrollHeight;
+
+  }catch(fout){
+    document.getElementById("balk").innerHTML =
+      `<div class="balk fout">${ontsnap(fout.message)}</div>`;
+  }
+}
+
+ververs();
+setInterval(ververs, 3000);
+</script>
+</body>
+</html>

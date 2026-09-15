@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  LaunchAgent voor de sniper.
+
+  LET OP: dit is een AGENT (in ~/Library/LaunchAgents/), geen daemon.
+  Alleen een agent draait in je ingelogde gebruikerssessie, en alleen daar
+  bestaan meldingen.
+
+  Vervang __MAP__ door het volledige pad naar de map ca-sniper, en
+  __PYTHON__ door de uitkomst van `which python3`.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>nl.casniper.bediening</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__PYTHON__</string>
+        <string>__MAP__/telegrambediening.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__MAP__</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <!-- Niet meteen opnieuw starten bij een fout: dan zie je de foutmelding nog. -->
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <key>StandardOutPath</key>
+    <string>__MAP__/gegevens/launchd-bediening.uit</string>
+    <key>StandardErrorPath</key>
+    <string>__MAP__/gegevens/launchd-bediening.fout</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+        <key>PYTHONIOENCODING</key>
+        <string>utf-8</string>
+    </dict>
+</dict>
+</plist>

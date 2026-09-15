@@ -1,0 +1,7 @@
+# Nooit meegeven aan git: hier staan je sleutels en je handelsgeschiedenis in.
+config.ini
+*.session
+*.session-journal
+gegevens/
+__pycache__/
+*.pyc
