@@ -56,6 +56,9 @@ Verder in Discord:
 
 ## Installeren
 
+> **Eerste keer?** Volg dan `STARTEN.md` — daar staat het hele stappenplan van
+> "niets" tot "hij koopt echt", met bij elke stap wat je moet zien.
+
 ```bash
 cd ca-sniper
 python3 -m pip install -r requirements.txt
