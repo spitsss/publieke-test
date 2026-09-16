@@ -40,7 +40,9 @@ Sleep de map opnieuw vanuit Finder.
 python3 --version
 ```
 
-**Wat je moet zien:** `Python 3.10` of hoger.
+**Wat je moet zien:** `Python 3.9` of hoger. De Python die Apple zelf op je Mac
+zet (`/usr/bin/python3`, versie 3.9.6) is genoeg — alle 214 tests zijn daarop
+gecontroleerd.
 
 **Gaat het mis?** Krijg je een venster over "command line developer tools",
 klik op **Installeer** en wacht tot dat klaar is. Probeer het daarna opnieuw.
@@ -52,7 +54,17 @@ python3 -m pip install -r requirements.txt
 ```
 
 **Wat je moet zien:** onderaan `Successfully installed telethon-... requests-...`
-(of `Requirement already satisfied`, dat is ook goed).
+(of `Requirement already satisfied`, dat is ook goed). Een regel
+`Defaulting to user installation` erboven is normaal.
+
+**Staat er `No module named pip`?** Dan mist Apple's Python zijn installeerhulpje.
+Haal het één keer op met:
+
+```bash
+python3 -m ensurepip --user
+```
+
+en doe daarna de regel hierboven opnieuw.
 
 Controleer meteen of alle onderdelen het doen:
 

@@ -47,7 +47,8 @@ Verder in Discord:
 ## Wat je nodig hebt
 
 1. Een Mac waar Discord op draait
-2. Python 3.10 of nieuwer (`python3 --version`)
+2. Python 3.9 of nieuwer — de Python die Apple standaard op je Mac zet is genoeg
+   (controleer met `python3 --version`)
 3. Een Telegram-account met `api_id` en `api_hash` van <https://my.telegram.org>
 4. BasedBot in je Telegram, met Quick Buy aan
 5. Een eigen bot bij [@BotFather](https://t.me/BotFather) om alles te bedienen
