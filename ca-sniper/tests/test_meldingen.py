@@ -229,3 +229,32 @@ class TestPaden(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHoofdlettersInBundelnaam(Basis):
+    """
+    Op de ene Mac staat Discord in de database als 'com.hnc.Discord', op de
+    andere als 'com.hnc.discord'. Vergelijk je letter voor letter, dan ziet de
+    bot NUL meldingen terwijl al het andere perfect werkt. Dit is echt gebeurd
+    en werd alleen opgemerkt doordat --diag de bundelnamen afdrukt.
+    """
+
+    def test_kleine_letters_in_de_database_worden_ook_herkend(self):
+        verbinding = sqlite3.connect(self.pad)
+        verbinding.execute("update app set identifier = 'com.hnc.discord' where app_id = 1")
+        verbinding.commit()
+        verbinding.close()
+
+        voeg_melding_toe(self.pad, 1, 1, "#calls (Alpha)", "", "CA: abc")
+        lezer = meldingen.Meldingenlezer(self.pad, ["com.hnc.Discord"])
+        self.assertEqual(1, len(lezer.nieuwe_meldingen(0)), "kleine letters moeten ook matchen")
+
+    def test_hoofdletters_in_config_werken_ook(self):
+        voeg_melding_toe(self.pad, 1, 1, "#calls (Alpha)", "", "CA: abc")
+        lezer = meldingen.Meldingenlezer(self.pad, ["COM.HNC.DISCORD"])
+        self.assertEqual(1, len(lezer.nieuwe_meldingen(0)))
+
+    def test_een_andere_app_wordt_nog_steeds_geweigerd(self):
+        voeg_melding_toe(self.pad, 1, 2, "test", "", "niet van discord")
+        lezer = meldingen.Meldingenlezer(self.pad, ["com.hnc.Discord"])
+        self.assertEqual([], lezer.nieuwe_meldingen(0))

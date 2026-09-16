@@ -208,6 +208,12 @@ class Meldingenlezer:
         if bundle_ids is None:
             bundle_ids = [DISCORD_BUNDLE]
         self.bundle_ids = [b.strip() for b in bundle_ids if b and b.strip()]
+        # LET OP: we vergelijken ZONDER op hoofdletters te letten.
+        # Op de ene Mac staat Discord in de database als 'com.hnc.Discord',
+        # op de andere als 'com.hnc.discord'. Vergelijk je letter voor letter,
+        # dan ziet de bot NUL meldingen terwijl al het andere perfect werkt —
+        # en dat merk je niet. Dit is echt op een Mac gebeurd.
+        self._bundels_laag = {b.lower() for b in self.bundle_ids}
         self.gevraagde_modus = (leesmodus or "auto").lower()
         self.modus = ""            # welke modus uiteindelijk werkt
         self.waarschuwingen: list[str] = []
@@ -373,7 +379,7 @@ class Meldingenlezer:
         uitkomst: list[Melding] = []
         for rec_id, blob, bezorgd, bundle in rijen:
             bundle = bundle or ""
-            if self.bundle_ids and bundle and bundle not in self.bundle_ids:
+            if self.bundle_ids and bundle and bundle.lower() not in self._bundels_laag:
                 continue
             if self.bundle_ids and not bundle and self.kan_op_app_filteren:
                 continue
@@ -516,9 +522,9 @@ def diagnose(db_pad: str = "auto", bundle_ids: list[str] | None = None) -> int:
     if not apps:
         print("   (kon ik niet bepalen)")
     for naam, aantal in apps[:15]:
-        merk = "  <-- dit is Discord" if naam == DISCORD_BUNDLE else ""
+        merk = "  <-- dit is Discord" if naam.lower() == DISCORD_BUNDLE.lower() else ""
         print(f"   {aantal:5d}  {naam}{merk}")
-    if apps and not any(naam == DISCORD_BUNDLE for naam, _ in apps):
+    if apps and not any(naam.lower() == DISCORD_BUNDLE.lower() for naam, _ in apps):
         print(
             f"\n   !! {DISCORD_BUNDLE} staat er niet bij. Óf Discord heeft recent geen\n"
             "      melding gestuurd, óf jouw installatie heeft een andere bundelnaam\n"
