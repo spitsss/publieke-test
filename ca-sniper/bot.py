@@ -39,8 +39,18 @@ from staat import DRYRUN, GEKOCHT, MISLUKT, ONBEKEND, Staat, VERSTUURD
 
 
 class Sniper:
-    def __init__(self, opties: Instellingen, logboek=None, staat: Staat | None = None) -> None:
+    def __init__(
+        self,
+        opties: Instellingen,
+        logboek=None,
+        staat: Staat | None = None,
+        extra_apps: list[str] | None = None,
+    ) -> None:
         self.opties = opties
+        # Apps die alleen VOOR DEZE KEER meegenomen worden, om de keten te
+        # testen met een zelf afgevuurde melding. Bewust niet in config.ini:
+        # dan kun je niet vergeten het terug te zetten.
+        self.extra_apps = [str(a).strip() for a in (extra_apps or []) if a and str(a).strip()]
         self.log = logboek or maak_logboek("sniper", opties.logniveau)
         # 'staat' is los mee te geven zodat de tests niet in je echte
         # gegevensmap rommelen.
@@ -98,8 +108,9 @@ class Sniper:
                 self.log.error("  - %s", probleem)
             return 2
 
+        apps = list(opties.bundle_ids) + self.extra_apps
         try:
-            self.lezer = Meldingenlezer(opties.db_pad, opties.bundle_ids, opties.leesmodus)
+            self.lezer = Meldingenlezer(opties.db_pad, apps, opties.leesmodus)
         except MeldingFout as fout:
             self.log.error("%s", fout)
             return 1
@@ -124,7 +135,13 @@ class Sniper:
         self.log.info("Bedrag/call   : %s %s", opties.bedrag, opties.valuta)
         self.log.info("BasedBot chain: %s (controle: %s)", opties.basedbot_chain, opties.chaincontrole)
         self.log.info("Kanalen       : %s", ", ".join(opties.kanalen) or "(geen!)")
-        self.log.info("Apps          : %s", ", ".join(opties.bundle_ids))
+        self.log.info("Apps          : %s", ", ".join(self.lezer.bundle_ids))
+        if self.extra_apps:
+            self.log.warning(
+                "TESTSTAND: ook %s wordt meegelezen. Dat geldt alleen zolang deze "
+                "bot draait; je instellingen zijn niet veranderd.",
+                ", ".join(self.extra_apps),
+            )
         self.log.info("Database      : %s (stand %s)", self.lezer.pad, self.lezer.modus)
         self.log.info("Zelf verkopen : %s", "aan" if opties.zelf_verkopen else "uit")
         self.log.info("=" * 60)
@@ -559,6 +576,16 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="voer zelf een neptekst door de keten, zonder Discord en zonder te kopen",
     )
+    ontleder.add_argument(
+        "--extra-app",
+        action="append",
+        default=None,
+        metavar="BUNDEL",
+        help=(
+            "lees deze app ook mee, alleen zolang deze bot draait. Handig om de keten "
+            "te testen met een zelf afgevuurde melding: --extra-app com.apple.ScriptEditor2"
+        ),
+    )
     argumenten = ontleder.parse_args(argv)
 
     opties = laad(argumenten.config)
@@ -600,7 +627,7 @@ def main(argv: list[str] | None = None) -> int:
         logboek.warning("LIVE-stand via --live. Er gaat nu echt geld weg.")
 
     try:
-        return Sniper(opties, logboek).draai()
+        return Sniper(opties, logboek, extra_apps=argumenten.extra_app).draai()
     finally:
         slot.geef_vrij()
 

@@ -260,3 +260,46 @@ class TestHeleKeten(unittest.TestCase):
         self.voeg(self.db, 4, 1, "#microcaps-calls (Alpha)", "", f"CA: {MINT2}")
         adressen = [o[2].adres for o in self.ronde()]
         self.assertEqual([MINT, MINT2], adressen)
+
+
+class TestExtraApp(Basis):
+    """
+    Met --extra-app kun je de keten testen met een zelf afgevuurde melding,
+    zonder config.ini aan te passen. Dat laatste is met opzet: een instelling
+    die je moet terugzetten, vergeet je een keer.
+    """
+
+    def test_extra_app_komt_erbij_en_niet_in_plaats_van(self):
+        import test_meldingen as nep
+        from meldingen import Meldingenlezer
+
+        db = str(self.map / "m.db")
+        nep.maak_database(db)
+        nep.voeg_melding_toe(db, 1, 1, "#microcaps-calls (A)", "", f"CA: {MINT}")
+        nep.voeg_melding_toe(db, 2, 2, "#microcaps-calls (Test)", "", f"CA: {MINT2}")
+
+        sniper = bot.Sniper(
+            self.opties, self.sniper.log, self.staat,
+            extra_apps=["com.apple.ScriptEditor2"],
+        )
+        lezer = Meldingenlezer(db, list(self.opties.bundle_ids) + sniper.extra_apps)
+        # Discord EN Scripteditor moeten nu allebei doorkomen.
+        self.assertEqual([1, 2], [m.rec_id for m in lezer.nieuwe_meldingen(0)])
+
+    def test_zonder_extra_app_alleen_discord(self):
+        import test_meldingen as nep
+        from meldingen import Meldingenlezer
+
+        db = str(self.map / "m2.db")
+        nep.maak_database(db)
+        nep.voeg_melding_toe(db, 1, 1, "#microcaps-calls (A)", "", f"CA: {MINT}")
+        nep.voeg_melding_toe(db, 2, 2, "#microcaps-calls (Test)", "", f"CA: {MINT2}")
+
+        sniper = bot.Sniper(self.opties, self.sniper.log, self.staat)
+        self.assertEqual([], sniper.extra_apps)
+        lezer = Meldingenlezer(db, list(self.opties.bundle_ids))
+        self.assertEqual([1], [m.rec_id for m in lezer.nieuwe_meldingen(0)])
+
+    def test_lege_en_rommelige_waarden_worden_genegeerd(self):
+        sniper = bot.Sniper(self.opties, self.sniper.log, self.staat, extra_apps=["", "  ", None])
+        self.assertEqual([], sniper.extra_apps)
