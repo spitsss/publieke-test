@@ -29,6 +29,7 @@ antwoord van BasedBot niet, dan is het resultaat ONBEKEND — nooit "gekocht".
 from __future__ import annotations
 
 import asyncio
+import inspect
 import re
 import threading
 import time
@@ -350,36 +351,78 @@ class TelegramBrug:
         return self._draai(_doe(), tijdslimiet=20.0)
 
 
-def _inloggen() -> int:
+async def _doe_inloggen(maak_client, basedbot: str) -> int:
+    """
+    Het eigenlijke inloggen. Apart en asynchroon, zodat de tests dit met een
+    nagemaakte client kunnen nalopen.
+
+    WAAROM DIT ZO MOET: elke functie van Telethon is een coroutine en moet met
+    'await' aangeroepen worden. Doe je dat niet, dan krijg je geen antwoord maar
+    de coroutine zelf terug, en klapt het eruit met
+    "'coroutine' object has no attribute 'id'". Dat gebeurde hier echt: het
+    inloggen lukte, maar de regel die "Gelukt" moest afdrukken sloeg stuk.
+    """
+    client = maak_client()
+    try:
+        await client.start()
+        ik = await client.get_me()
+
+        # HARD FALEN als hier geen echte gebruiker uitkomt.
+        # Eerst stond hier een vriendelijk vangnet dat bij twijfel "?" afdrukte.
+        # Daardoor veranderde een vergeten 'await' van een luide crash in een
+        # stil verkeerd antwoord: "Gelukt. Ingelogd als ?." terwijl er niets
+        # klopte. Dat is precies de fout die deze bot moet voorkomen, dus
+        # liever een duidelijke klap dan een vraagteken.
+        if inspect.iscoroutine(ik) or ik is None:
+            raise RuntimeError(
+                "get_me() gaf geen gebruiker terug. Dit is een programmeerfout in de bot "
+                "(waarschijnlijk een vergeten 'await'), geen fout van jou."
+            )
+        naam = getattr(ik, "username", None) or getattr(ik, "first_name", None)
+        if not naam:
+            raise RuntimeError(f"Ingelogd, maar ik kan je naam niet uitlezen uit {ik!r}")
+        print(f"Gelukt. Ingelogd als {naam}.")
+
+        try:
+            bot = await client.get_entity(basedbot)
+        except Exception as fout:
+            print(f"\nLet op: '{basedbot}' kon ik niet vinden ({fout}).")
+            print("Klopt de @naam precies? En heb je al een keer met de bot gepraat?")
+            print("Stuur hem in Telegram eerst /start en probeer dit opnieuw.")
+            return 1
+        print(f"BasedBot gevonden: {getattr(bot, 'username', None) or basedbot}")
+        return 0
+    finally:
+        try:
+            await client.disconnect()
+        except Exception:
+            pass
+
+
+def _inloggen(maak_client=None) -> int:
     """Eenmalig inloggen bij Telegram. Maakt het sessiebestand aan."""
     from gereedschap import zet_uitvoer_op_utf8
     from instellingen import laad
 
     zet_uitvoer_op_utf8()
     opties = laad()
-    if TelegramClient is None:
+    if TelegramClient is None and maak_client is None:
         print("Telethon ontbreekt. Doe: pip install -r requirements.txt")
         return 1
-    if not opties.api_id or not opties.api_hash:
+    if maak_client is None and (not opties.api_id or not opties.api_hash):
         print("Vul eerst api_id en api_hash in config.ini in (van my.telegram.org).")
         return 1
 
     print("Inloggen bij Telegram. Je krijgt zo een code in je Telegram-app.")
     print("LET OP: kopieer het sessiebestand daarna NOOIT naar een andere map")
     print("of machine. Twee clients met dezelfde sessie krijgen geen updates meer.")
-    client = TelegramClient(opties.sessienaam, opties.api_id, opties.api_hash)
-    with client:
-        client.start()
-        ik = client.get_me()
-        print(f"Gelukt. Ingelogd als {getattr(ik, 'username', None) or ik.id}.")
-        try:
-            bot = client.get_entity(opties.basedbot)
-            print(f"BasedBot gevonden: {getattr(bot, 'username', opties.basedbot)}")
-        except Exception as fout:
-            print(f"Let op: '{opties.basedbot}' kon ik niet vinden ({fout}).")
-            print("Klopt de @naam? Heb je al een keer met de bot gepraat?")
-            return 1
-    return 0
+
+    if maak_client is None:
+        def maak_client():
+            return TelegramClient(opties.sessienaam, opties.api_id, opties.api_hash)
+
+    # De client wordt BINNEN de lus gemaakt, zodat hij aan die lus vastzit.
+    return asyncio.run(_doe_inloggen(maak_client, opties.basedbot))
 
 
 if __name__ == "__main__":
