@@ -724,6 +724,134 @@ def _meet(db_pad: str, bundle_ids: list[str], poll_ms: int, aantal: int = 20) ->
     return 0
 
 
+def _meet_zelf(db_pad: str, rondes: int = 3) -> int:
+    """
+    De beslissende proef: waar zit de vertraging precies?
+
+    We vuren zelf een melding af en houden de klok bij vanaf het moment dat
+    WIJ de opdracht geven. Daarna meten we drie dingen:
+
+      opdracht -> bezorgd   wat macOS zelf in de database zet als bezorgtijd
+      opdracht -> zichtbaar hoe lang het duurt voordat wij de regel kunnen lezen
+      bezorgd  -> zichtbaar het verschil daartussen
+
+Waarom dit uitmaakt: is 'opdracht -> bezorgd' al seconden, dan is macOS traag
+    met bezorgen en valt er niets aan te doen. Is dat klein maar
+    'bezorgd -> zichtbaar' groot, dan schrijft het Berichtencentrum de regel
+    pas later weg en heeft het misschien zin om een andere leesstand te
+    proberen. Dat testen we dus meteen: alle drie de standen.
+
+    Dit werkt alleen op macOS, want we hebben osascript nodig.
+    """
+    zet_uitvoer_op_utf8()
+    if sys.platform != "darwin":
+        print("Deze proef werkt alleen op macOS (osascript is nodig).")
+        return 1
+
+    standen = ["ro", "nolock", "immutable"]
+    uitslagen: dict[str, list[float]] = {stand: [] for stand in standen}
+    bezorgverschillen: list[float] = []
+
+    print("PROEF: waar zit de vertraging?")
+    print("=" * 74)
+    print("Per ronde vuren we zelf een melding af en kijken hoe snel we hem zien.\n")
+
+    for stand in standen:
+        try:
+            lezer = Meldingenlezer(db_pad, [], stand)
+        except MeldingFout as fout:
+            print(f"stand {stand:10s}: kan niet ({fout})")
+            continue
+
+        print(f"stand {stand}:")
+        for ronde in range(rondes):
+            try:
+                laatste = lezer.hoogste_rec_id()
+            except MeldingFout as fout:
+                print(f"   ronde {ronde + 1}: kan het hoogste nummer niet ophalen ({fout})")
+                continue
+
+            kenmerk = f"meetproef-{stand}-{ronde}-{int(time.time())}"
+            opdracht = time.time()
+            try:
+                subprocess.run(
+                    ["osascript", "-e",
+                     f'display notification "{kenmerk}" with title "meetproef"'],
+                    capture_output=True, timeout=10,
+                )
+            except Exception as fout:
+                print(f"   ronde {ronde + 1}: osascript lukte niet ({fout})")
+                continue
+
+            # Wachten tot de regel te lezen is, maximaal 30 seconden.
+            gevonden = None
+            einde = opdracht + 30
+            while time.time() < einde:
+                try:
+                    for melding in lezer.nieuwe_meldingen(laatste, limiet=20):
+                        if kenmerk in melding.tekst:
+                            gevonden = melding
+                            break
+                except MeldingFout:
+                    pass
+                if gevonden:
+                    break
+                time.sleep(0.05)
+
+            if gevonden is None:
+                print(f"   ronde {ronde + 1}: melding binnen 30 s niet gezien")
+                continue
+
+            zichtbaar_ms = (time.time() - opdracht) * 1000
+            uitslagen[stand].append(zichtbaar_ms)
+            if gevonden.bezorgd_op:
+                bezorgd_ms = (gevonden.bezorgd_op - opdracht) * 1000
+                verschil_ms = (gevonden.gezien_op - gevonden.bezorgd_op) * 1000
+                bezorgverschillen.append(verschil_ms)
+                print(
+                    f"   ronde {ronde + 1}: opdracht->bezorgd {bezorgd_ms:7.0f} ms | "
+                    f"bezorgd->zichtbaar {verschil_ms:7.0f} ms | "
+                    f"opdracht->zichtbaar {zichtbaar_ms:7.0f} ms"
+                )
+            else:
+                print(f"   ronde {ronde + 1}: opdracht->zichtbaar {zichtbaar_ms:7.0f} ms (geen bezorgtijd)")
+            time.sleep(1)
+        print()
+
+    print("=" * 74)
+    print("WAT DIT BETEKENT\n")
+    beste = None
+    for stand in standen:
+        metingen = uitslagen[stand]
+        if not metingen:
+            print(f"  {stand:10s}: niet gemeten")
+            continue
+        gemiddeld = sum(metingen) / len(metingen)
+        print(f"  {stand:10s}: opdracht -> zichtbaar gemiddeld {gemiddeld:7.0f} ms "
+              f"({len(metingen)} metingen)")
+        if beste is None or gemiddeld < beste[1]:
+            beste = (stand, gemiddeld)
+
+    if bezorgverschillen:
+        midden = sorted(bezorgverschillen)[len(bezorgverschillen) // 2]
+        print(f"\n  bezorgd -> zichtbaar, midden: {midden:.0f} ms")
+        if midden > 1500:
+            print(
+                "\n  Dit is de kern van de zaak: macOS zet wel een bezorgtijd in de\n"
+                "  database, maar de regel is pas SECONDEN later te lezen. Het\n"
+                "  Berichtencentrum schrijft dus met vertraging weg. Daar valt van\n"
+                "  buitenaf niets aan te doen: dit is de bodem van deze aanpak."
+            )
+        else:
+            print("\n  De regel is vlot te lezen nadat macOS hem bezorgd heeft.")
+
+    if beste:
+        print(f"\n  Snelste leesstand: {beste[0]} ({beste[1]:.0f} ms).")
+        print("  Verschillen de standen nauwelijks, dan zit de vertraging niet in het")
+        print("  lezen maar in het wegschrijven, en helpt een andere stand dus niet.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     zet_uitvoer_op_utf8()
     ontleder = argparse.ArgumentParser(description="Lezer van het macOS Berichtencentrum")
@@ -734,6 +862,11 @@ def main(argv: list[str] | None = None) -> int:
         "--meet", action="store_true", help="meet hoe snel meldingen binnenkomen"
     )
     ontleder.add_argument("--aantal", type=int, default=20, help="hoeveel meldingen meten")
+    ontleder.add_argument(
+        "--meet-zelf",
+        action="store_true",
+        help="vuur zelf meldingen af en zoek uit WAAR de vertraging zit (alleen macOS)",
+    )
     ontleder.add_argument("--db", default="auto", help="pad naar de database")
     ontleder.add_argument(
         "--bundle",
@@ -752,6 +885,8 @@ def main(argv: list[str] | None = None) -> int:
             for naam, aantal in lezer.apps_met_aantallen():
                 print(f"{aantal:6d}  {naam}")
             return 0
+        if argumenten.meet_zelf:
+            return _meet_zelf(argumenten.db)
         if argumenten.meet:
             return _meet(
                 argumenten.db, [b for b in bundels if b], argumenten.poll_ms, argumenten.aantal
