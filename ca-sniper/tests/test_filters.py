@@ -133,3 +133,56 @@ class TestEchteDiscordTitels(unittest.TestCase):
             with self.subTest(titel=titel):
                 mag, _ = filters.kanaal_toegestaan(titel, "", ["algemene-chat"])
                 self.assertTrue(mag)
+
+
+class TestCallskanaalVanDeGebruiker(unittest.TestCase):
+    """
+    Het echte callskanaal staat in Discord als:  # 💎 | microcaps-calls
+    in de server 'Officiële Calls Spot'.
+
+    Ik weet niet welke vorm de melding krijgt: Discord zet er een emoji voor,
+    met een streepje ertussen, en mensen gebruiken daarvoor allerlei tekens die
+    er hetzelfde uitzien maar het niet zijn. Er kunnen ook spaties om dat
+    streepje staan. Daarom staan hier ALLE varianten die we kunnen bedenken —
+    raden is hier twee keer eerder fout gegaan.
+    """
+
+    FILTER = ["microcaps-calls"]
+
+    VARIANTEN = {
+        "gewoon streepje": "Iemand (#\U0001F48E|microcaps-calls, Officiële Calls Spot)",
+        "spaties om het streepje": "Iemand (#\U0001F48E | microcaps-calls, Officiële Calls Spot)",
+        "breed streepje": "Iemand (#\U0001F48E｜microcaps-calls, Officiële Calls Spot)",
+        "chinees streepje": "Iemand (#\U0001F48E丨microcaps-calls, Officiële Calls Spot)",
+        "verticale streep": "Iemand (#\U0001F48E│microcaps-calls, Officiële Calls Spot)",
+        "alleen een spatie": "Iemand (#\U0001F48E microcaps-calls, Officiële Calls Spot)",
+        "zonder emoji": "Iemand (#microcaps-calls, Officiële Calls Spot)",
+        "zelf afgevuurde testmelding": "#microcaps-calls (Test)",
+    }
+
+    def test_elke_vorm_van_het_callskanaal_komt_door(self):
+        for naam, titel in self.VARIANTEN.items():
+            with self.subTest(vorm=naam):
+                mag, reden = filters.kanaal_toegestaan(titel, "", self.FILTER)
+                self.assertTrue(mag, f"{naam} werd geweigerd: {reden}")
+
+    def test_de_kletskanalen_van_de_gebruiker_komen_niet_door(self):
+        """Echte kanalen van dezelfde persoon waar GEEN calls in staan."""
+        for titel in (
+            "KOOBY (#\U0001F4B5|algemene-chat, Algemeen)",
+            "Thexrpjunk (#☕|koffiehuis\U0001F51E, \U0001F525 Lifestyle & Koffiehuis)",
+            "DysCrypto (#\U0001F4AC|public-chat, Algemeen)",
+        ):
+            with self.subTest(titel=titel[:40]):
+                mag, _ = filters.kanaal_toegestaan(titel, "", self.FILTER)
+                self.assertFalse(mag)
+
+    def test_een_lijkend_kanaal_komt_niet_door(self):
+        mag, _ = filters.kanaal_toegestaan(
+            "Iemand (#\U0001F48E|microcaps-calls-vip, Calls Spot)", "", self.FILTER
+        )
+        self.assertFalse(mag, "microcaps-calls-vip is een ANDER kanaal")
+
+    def test_een_dm_komt_niet_door(self):
+        mag, _ = filters.kanaal_toegestaan("Peter", "", self.FILTER)
+        self.assertFalse(mag)

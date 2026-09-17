@@ -9,6 +9,7 @@ Hoe een Discord-melding er ECHT uitziet (afgekeken van een echte Mac):
 
     titel  "KOOBY (#💵|algemene-chat, Algemeen)"     <- kanaal in een server
     titel  "Thexrpjunk (#☕|koffiehuis🔞, 🔥 Lifestyle)"  <- met emoji in de naam
+    titel  "Iemand (#💎 | microcaps-calls, Calls Spot)"  <- met spaties om het streepje
     titel  "Sander"                                  <- privébericht (DM)
     titel  "#microcaps-calls (Test)"                 <- zelf afgevuurde testmelding
     body   de berichttekst zelf
@@ -35,9 +36,15 @@ from __future__ import annotations
 
 import re
 
-# Het stuk achter een # tot aan een komma, een haakje of een spatie.
-# De komma en de haakjes horen NIET bij de kanaalnaam.
-_KANAAL_IN_TITEL = re.compile(r"#\s*([^\s,()]+)")
+# Het stuk achter een # tot aan een komma of een haakje. Spaties laten we er
+# BEWUST in staan: Discord toont een kanaal soms als "# 💎 | microcaps-calls",
+# met spaties om het streepje. Zou je bij de eerste spatie stoppen, dan hou je
+# alleen de emoji over en matcht je kanaal nooit.
+_KANAAL_IN_TITEL = re.compile(r"#\s*([^,()]+)")
+
+# Het streepje tussen de emoji en de kanaalnaam. Mensen gebruiken hiervoor
+# allerlei lookalikes: ze zien er hetzelfde uit maar zijn andere tekens.
+_SCHEIDINGSTEKENS = ("|", "｜", "丨", "│", "∣", "ǀ")
 
 # Wat overblijft als je emoji en leestekens weghaalt: letters, cijfers,
 # streepje en liggend streepje.
@@ -57,10 +64,13 @@ def kanaal_uit_titel(titel: str) -> str:
     if not treffer:
         return ""
     naam = treffer.group(1).strip()
-    # Discord zet soms een emoji vóór de naam, met een liggend streepje ertussen:
-    # "💵|algemene-chat". De echte naam staat achter het laatste streepje.
-    if "|" in naam:
-        naam = naam.rsplit("|", 1)[-1]
+    # Discord zet vaak een emoji vóór de naam, met een streepje ertussen:
+    # "💵|algemene-chat" of "💎 | microcaps-calls". De echte naam staat
+    # achter het laatste streepje. Staat er geen streepje maar wel een spatie,
+    # dan haalt vereenvoudig() de emoji er later alsnog af.
+    for teken in _SCHEIDINGSTEKENS:
+        if teken in naam:
+            naam = naam.rsplit(teken, 1)[-1]
     return naam.strip().strip(",.;:").lower()
 
 
