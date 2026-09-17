@@ -651,12 +651,89 @@ def _volg(db_pad: str, bundle_ids: list[str], poll_ms: int) -> int:
     return 0
 
 
+def _meet(db_pad: str, bundle_ids: list[str], poll_ms: int, aantal: int = 20) -> int:
+    """
+    Meet hoe lang het duurt voordat een melding bij ons aankomt.
+
+    We meten twee dingen apart, want dat is het hele punt:
+
+      bezorgd -> gezien : de tijd tussen het tijdstempel dat macOS zelf aan de
+                          melding hangt en het moment dat wij de regel kunnen
+                          lezen. Hier hebben wij GEEN invloed op.
+      poll-ronde        : hoe lang onze eigen ronde duurt. Daar hebben we wel
+                          invloed op, en die hoort een paar milliseconden te zijn.
+
+    Zonder dit onderscheid weet je niet of de bot traag is of macOS.
+    """
+    zet_uitvoer_op_utf8()
+    lezer = Meldingenlezer(db_pad, bundle_ids, "auto")
+    for waarschuwing in lezer.waarschuwingen:
+        print(f"!! {waarschuwing}")
+
+    laatste = lezer.hoogste_rec_id()
+    print(f"Meten vanaf rec_id {laatste} (stand: {lezer.modus}, elke {poll_ms} ms).")
+    print(f"Stopt na {aantal} meldingen, of eerder met Ctrl-C.\n")
+    print(f"{'tijd':>8}  {'bezorgd->gezien':>16}  {'ronde':>7}  melding")
+    print("-" * 78)
+
+    vertragingen: list[float] = []
+    rondes: list[float] = []
+    try:
+        while len(vertragingen) < aantal:
+            begin = time.time()
+            try:
+                gevonden = lezer.nieuwe_meldingen(laatste)
+            except MeldingFout as fout:
+                print(f"(even niet gelukt: {fout})")
+                time.sleep(poll_ms / 1000)
+                continue
+            ronde_ms = (time.time() - begin) * 1000
+            rondes.append(ronde_ms)
+
+            for melding in gevonden:
+                laatste = max(laatste, melding.rec_id)
+                if not melding.bezorgd_op:
+                    vertraging = float("nan")
+                    weergave = "geen tijdstempel"
+                else:
+                    vertraging = (melding.gezien_op - melding.bezorgd_op) * 1000
+                    vertragingen.append(vertraging)
+                    weergave = f"{vertraging:8.0f} ms"
+                klok = time.strftime("%H:%M:%S", time.localtime(melding.gezien_op))
+                print(f"{klok:>8}  {weergave:>16}  {ronde_ms:5.1f}ms  {kort(melding.titel, 34)}")
+
+            time.sleep(poll_ms / 1000)
+    except KeyboardInterrupt:
+        print("\nGestopt.")
+
+    print("\n" + "=" * 78)
+    if vertragingen:
+        gesorteerd = sorted(vertragingen)
+        midden = gesorteerd[len(gesorteerd) // 2]
+        print(f"{len(vertragingen)} meldingen gemeten.")
+        print(f"  bezorgd -> gezien : snelste {min(gesorteerd):.0f} ms, "
+              f"midden {midden:.0f} ms, langzaamste {max(gesorteerd):.0f} ms")
+        print("  Dit is macOS, niet de bot. Is het midden hoger dan ongeveer 1500 ms,")
+        print("  dan is de meldingsroute op deze Mac simpelweg traag en valt daar")
+        print("  met deze aanpak niets aan te doen.")
+    else:
+        print("Geen meldingen met een tijdstempel gemeten.")
+    if rondes:
+        print(f"  onze eigen ronde  : gemiddeld {sum(rondes) / len(rondes):.1f} ms "
+              f"(hoort een paar milliseconden te zijn)")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     zet_uitvoer_op_utf8()
     ontleder = argparse.ArgumentParser(description="Lezer van het macOS Berichtencentrum")
     ontleder.add_argument("--diag", action="store_true", help="controleer de hele opstelling")
     ontleder.add_argument("--volg", action="store_true", help="laat live meldingen zien")
     ontleder.add_argument("--apps", action="store_true", help="toon alle bundelnamen")
+    ontleder.add_argument(
+        "--meet", action="store_true", help="meet hoe snel meldingen binnenkomen"
+    )
+    ontleder.add_argument("--aantal", type=int, default=20, help="hoeveel meldingen meten")
     ontleder.add_argument("--db", default="auto", help="pad naar de database")
     ontleder.add_argument(
         "--bundle",
@@ -675,6 +752,10 @@ def main(argv: list[str] | None = None) -> int:
             for naam, aantal in lezer.apps_met_aantallen():
                 print(f"{aantal:6d}  {naam}")
             return 0
+        if argumenten.meet:
+            return _meet(
+                argumenten.db, [b for b in bundels if b], argumenten.poll_ms, argumenten.aantal
+            )
         if argumenten.volg:
             return _volg(argumenten.db, [b for b in bundels if b], argumenten.poll_ms)
         return diagnose(argumenten.db, bundels)

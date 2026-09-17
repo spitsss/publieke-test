@@ -163,3 +163,52 @@ class TestOnmogelijkeCombinatie(unittest.TestCase):
         mag, reden = markt.controleer_chain(self.EVM, "evm", "solana", "warn")
         self.assertTrue(mag)
         self.assertIn("solana", reden)
+
+
+class TestNetwerkcontrole(unittest.TestCase):
+    """
+    De netwerkcontrole bestaat omdat een mislukte opzoeking STIL is: de
+    chaincontrole laat dan elk adres door met "kon niet opzoeken". Dan lijkt de
+    bot te werken terwijl hij niets controleert.
+
+    Hier bootsen we het netwerk na; er gaat niets naar buiten.
+    """
+
+    def test_werkend_netwerk(self):
+        origineel = markt.haal_token
+        markt.haal_token = lambda adres, limiet: [
+            {"chainId": "solana", "baseToken": {"address": adres}},
+            {"chainId": "ethereum", "baseToken": {"address": adres}},
+        ]
+        try:
+            gelukt, uitleg, ms = markt.controleer_netwerk()
+        finally:
+            markt.haal_token = origineel
+        self.assertTrue(gelukt)
+        self.assertIn("werkt", uitleg)
+        self.assertIn("solana", uitleg)
+
+    def test_leeg_antwoord_is_een_probleem(self):
+        """USDC hoort er ALTIJD te zijn. Niets terug = het netwerk is stuk."""
+        origineel = markt.haal_token
+        markt.haal_token = lambda adres, limiet: []
+        try:
+            gelukt, uitleg, _ = markt.controleer_netwerk()
+        finally:
+            markt.haal_token = origineel
+        self.assertFalse(gelukt)
+        self.assertIn("laat alles door", uitleg)
+
+    def test_een_fout_wordt_gemeld_en_niet_verzwegen(self):
+        origineel = markt.haal_token
+
+        def stuk(adres, limiet):
+            raise OSError("SSL: CERTIFICATE_VERIFY_FAILED")
+
+        markt.haal_token = stuk
+        try:
+            gelukt, uitleg, _ = markt.controleer_netwerk()
+        finally:
+            markt.haal_token = origineel
+        self.assertFalse(gelukt)
+        self.assertIn("CERTIFICATE", uitleg)

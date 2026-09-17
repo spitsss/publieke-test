@@ -603,6 +603,18 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print("  instellingen zien er goed uit")
         print(f"  dryrun: {'AAN (er wordt niets gekocht)' if opties.dryrun else 'UIT — LIVE'}")
+
+        print("\n--- netwerk (voor de chaincontrole) ---")
+        import markt as marktmodule
+
+        gelukt, uitleg, ms = marktmodule.controleer_netwerk()
+        print(f"  {'in orde' if gelukt else 'PROBLEEM'} ({ms} ms): {uitleg}")
+        if not gelukt:
+            print(
+                "\n  Zolang dit niet werkt, kan de chaincontrole niets opzoeken en\n"
+                "  laat hij elk 0x-adres door. Op solana maakt dat niet uit, maar op\n"
+                "  een EVM-chain wel."
+            )
         return code
 
     if argumenten.test_melding:

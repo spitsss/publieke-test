@@ -202,6 +202,59 @@ def controleer_chain(
     return (stand == "warn"), melding
 
 
+def controleer_netwerk(limiet_ms: int = 5000) -> tuple[bool, str, int]:
+    """
+    Kijkt of Dexscreener echt bereikbaar is, met een token dat zeker bestaat.
+
+    Waarom dit nodig is: als het opzoeken stilletjes mislukt, laat de
+    chaincontrole ELK adres door met "kon niet opzoeken". De bot lijkt dan te
+    werken maar controleert niets. Dit is de enige manier om dat te merken
+    zonder erop te wachten dat het een keer fout gaat.
+
+    Op macOS is de bekendste oorzaak urllib3 v2 in combinatie met LibreSSL.
+    Geeft (gelukt, uitleg, milliseconden) terug.
+    """
+    import time as _tijd
+
+    if requests is None:
+        return False, "de module 'requests' ontbreekt (pip install -r requirements.txt)", 0
+
+    # Waarschuw als de bekende macOS-combinatie aanwezig is.
+    waarschuwing = ""
+    try:
+        import ssl
+
+        import urllib3
+
+        if urllib3.__version__.startswith("2.") and "LibreSSL" in ssl.OPENSSL_VERSION:
+            waarschuwing = (
+                f" LET OP: urllib3 {urllib3.__version__} met {ssl.OPENSSL_VERSION}. "
+                "Die combinatie werkt niet goed. Doe: "
+                "python3 -m pip install 'urllib3<2'"
+            )
+    except Exception:
+        pass
+
+    # USDC op Solana bestaat altijd; komt hier niets uit, dan is het netwerk stuk.
+    usdc = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+    begin = _tijd.time()
+    try:
+        paren = haal_token(usdc, limiet_ms)
+    except Exception as fout:
+        return False, f"opzoeken gaf een fout: {fout}.{waarschuwing}", int((_tijd.time() - begin) * 1000)
+    ms = int((_tijd.time() - begin) * 1000)
+
+    if not paren:
+        return False, (
+            "Dexscreener gaf geen antwoord voor USDC — dat hoort er altijd te zijn. "
+            "De chaincontrole kan dus niets opzoeken en laat alles door."
+            + waarschuwing
+        ), ms
+
+    chains = ", ".join(sorted({str(p.get("chainId")) for p in paren})[:5])
+    return True, f"Dexscreener werkt ({len(paren)} paren gevonden, chains: {chains}).{waarschuwing}", ms
+
+
 # ----------------------------------------------------------- Blockscout
 
 def blockscout_adresveld(object_: dict) -> str:

@@ -1,3 +1,9 @@
-# Alleen deze twee zijn echt nodig.
+# Alleen deze drie zijn echt nodig.
 telethon==1.36.0   # praat met BasedBot via je eigen Telegram-account
 requests==2.32.3   # Dexscreener, Blockscout en de bedieningsbot
+
+# urllib3 v2 werkt NIET met de LibreSSL die macOS meelevert. Je krijgt dan
+# "NotOpenSSLWarning" en HTTPS-verzoeken kunnen stilletjes mislukken — precies
+# het onderdeel waarmee de chaincontrole Dexscreener opzoekt. Versie 1.26 werkt
+# wel met LibreSSL.
+urllib3<2
