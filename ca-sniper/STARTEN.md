@@ -147,11 +147,29 @@ python3 meldingen.py --volg
 Laat iemand iets in het callskanaal posten, of post zelf iets vanaf je telefoon
 in een ánder Discord-kanaal dan je open hebt staan.
 
-**Wat je moet zien:** binnen een paar seconden verschijnt er een regel met
-`[nummer] com.hnc.Discord | #kanaalnaam (Server) | de tekst`.
+**Wat je moet zien:** binnen een paar seconden verschijnt er een regel. Zo
+ziet een echte Discord-kanaalmelding eruit (afgekeken van een echte Mac):
 
-Schrijf op wat er precies tussen de eerste twee streepjes staat — die
-kanaalnaam heb je zo nodig.
+```
+[1641] com.hnc.discord | KOOBY (#💵|algemene-chat, Algemeen) | Gm boys
+```
+
+Lees die titel goed, want hij is rommeliger dan je zou denken:
+
+| Stuk | Wat het is |
+|---|---|
+| `KOOBY` | de afzender van het bericht |
+| `#💵\|algemene-chat` | het kanaal, met een emoji en een liggend streepje ervoor |
+| `Algemeen` | de server (of de categorie) |
+| `Gm boys` | de berichttekst |
+
+**De kanaalnaam is het stuk achter het liggende streepje**, hier dus
+`algemene-chat`. Dat is wat je straks in config.ini zet — zonder hekje, zonder
+emoji en zonder komma. Zit er een emoji in de naam zelf (zoals `koffiehuis🔞`),
+dan is `koffiehuis` genoeg: emoji hoef je niet te kunnen typen.
+
+Een privébericht heeft géén `#` in de titel, alleen de naam van de afzender
+(`Peter`). Die worden daarom automatisch geweigerd.
 
 Stoppen met **ctrl-C**.
 

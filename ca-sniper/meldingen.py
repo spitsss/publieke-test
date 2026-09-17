@@ -362,6 +362,63 @@ class Meldingenlezer:
         except sqlite3.Error as fout:
             raise MeldingFout(f"Kan het hoogste rec_id niet ophalen: {fout}") from fout
 
+    def controleer_terugval(self, laatste_rec_id: int) -> int | None:
+        """
+        Kijkt of het Berichtencentrum is opgeschoond en de nummering daardoor
+        is terugverdwenen.
+
+        Waarom dit bestaat: wist de gebruiker zijn meldingen (de knop 'Wis' in
+        het Berichtencentrum), dan gooit macOS oude rijen weg en begint hij
+        opnieuw te tellen. Het hoogste rec_id wordt dan LAGER dan wat de bot
+        onthouden had. Nieuwe meldingen komen daarna binnen met een nummer
+        onder ons startpunt — en die zou de bot allemaal negeren, zonder ook
+        maar één foutmelding. Hij draait, ziet niets, en je merkt het niet.
+
+        Geeft het nieuwe (lagere) startpunt terug, of None als er niets aan de
+        hand is.
+        """
+        hoogste = self.hoogste_rec_id()
+        if hoogste < laatste_rec_id:
+            return hoogste
+        return None
+
+    def meldingen_na_tijd(self, na_tijd: float, limiet: int = 100) -> list[Melding]:
+        """
+        Haalt meldingen op die NA een bepaald tijdstip bezorgd zijn, ongeacht
+        hun nummer. Oudste eerst.
+
+        Dit is het vangnet voor als de nummering is terugverdwenen doordat de
+        gebruiker zijn meldingen wiste. Het nummer is dan niet te vertrouwen,
+        de bezorgtijd wel. We vragen de NIEUWSTE rijen op (order by desc), want
+        precies daar zitten de meldingen die we gemist kunnen hebben.
+        """
+        vraag = f"{self._selectie()} order by r.rec_id desc limit ?"
+        try:
+            with self.verbinding() as verbinding:
+                rijen = verbinding.execute(vraag, (limiet,)).fetchall()
+        except sqlite3.Error as fout:
+            raise MeldingFout(str(fout)) from fout
+
+        uitkomst: list[Melding] = []
+        for rec_id, blob, bezorgd, bundle in rijen:
+            bundle = bundle or ""
+            if self.bundle_ids and bundle and bundle.lower() not in self._bundels_laag:
+                continue
+            if self.bundle_ids and not bundle and self.kan_op_app_filteren:
+                continue
+            melding = self._pak_uit(rec_id, blob, bezorgd, bundle)
+            if melding is None:
+                continue
+            # Zonder bezorgtijd kunnen we niet beoordelen of hij nieuw is.
+            # Dan laten we hem liggen: liever een call missen dan een oude
+            # melding opnieuw kopen.
+            if not melding.bezorgd_op or melding.bezorgd_op <= na_tijd:
+                continue
+            uitkomst.append(melding)
+
+        uitkomst.sort(key=lambda m: m.rec_id)
+        return uitkomst
+
     def nieuwe_meldingen(self, na_rec_id: int, limiet: int = 50) -> list[Melding]:
         """
         Haalt alle meldingen op met een rec_id hoger dan wat je al gezien hebt,
@@ -562,12 +619,30 @@ def _volg(db_pad: str, bundle_ids: list[str], poll_ms: int) -> int:
     print(f"Meekijken vanaf rec_id {laatste} (stand: {lezer.modus}). Ctrl-C om te stoppen.")
     print("Vuur een testmelding af met:")
     print("   osascript -e 'display notification \"hallo\" with title \"test\"'")
+    laatste_controle = 0.0
+    laatste_tijd = time.time()
     try:
         while True:
             try:
-                for melding in lezer.nieuwe_meldingen(laatste):
+                gevonden = lezer.nieuwe_meldingen(laatste)
+                for melding in gevonden:
                     laatste = max(laatste, melding.rec_id)
+                    laatste_tijd = max(laatste_tijd, melding.bezorgd_op or 0.0)
                     print(melding)
+                # Niets nieuws? Kijk dan af en toe of het Berichtencentrum
+                # is opgeschoond en de nummering is terugverdwenen.
+                if not gevonden and time.time() - laatste_controle > 5:
+                    laatste_controle = time.time()
+                    terug = lezer.controleer_terugval(laatste)
+                    if terug is not None:
+                        print(
+                            f"(meldingen zijn gewist: nummering viel terug van "
+                            f"{laatste} naar {terug} — ik kijk op bezorgtijd verder)"
+                        )
+                        for melding in lezer.meldingen_na_tijd(laatste_tijd):
+                            laatste_tijd = max(laatste_tijd, melding.bezorgd_op)
+                            print(melding)
+                        laatste = lezer.hoogste_rec_id()
             except MeldingFout as fout:
                 print(f"(even niet gelukt: {fout})")
             time.sleep(poll_ms / 1000)

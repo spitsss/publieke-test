@@ -5,12 +5,19 @@ Dit filter is VERPLICHT. Zonder kanaalfilter reageert de bot op élke
 Discord-melding: ook op een privébericht van een vriend die een adres plakt,
 of op een willekeurig ander kanaal van dezelfde server.
 
-Hoe een Discord-melding eruitziet:
+Hoe een Discord-melding er ECHT uitziet (afgekeken van een echte Mac):
 
-    titel      "#microcaps-calls (Alpha Group)"   <- kanaal in een server
-    titel      "Sander"                           <- privébericht (DM)
-    ondertitel soms de servernaam of de afzender
-    body       de berichttekst zelf
+    titel  "KOOBY (#💵|algemene-chat, Algemeen)"     <- kanaal in een server
+    titel  "Thexrpjunk (#☕|koffiehuis🔞, 🔥 Lifestyle)"  <- met emoji in de naam
+    titel  "Sander"                                  <- privébericht (DM)
+    titel  "#microcaps-calls (Test)"                 <- zelf afgevuurde testmelding
+    body   de berichttekst zelf
+
+Let op hoe rommelig dat is: eerst de naam van de afzender, dan tussen haakjes
+het kanaal met een emoji en een liggend streepje ervoor, een komma, en dan de
+server. Wie hier alleen naar "#iets" zoekt, haalt "💵|algemene-chat," uit de
+titel — mét emoji, streepje en komma — en matcht dus nooit met wat jij in
+config.ini hebt getypt. Daarom knippen we het netjes uit elkaar.
 
 Hoe je een kanaal opgeeft in config.ini, onder [filter] kanalen:
 
@@ -28,14 +35,42 @@ from __future__ import annotations
 
 import re
 
-# Uit "#microcaps-calls (Alpha Group)" halen we "microcaps-calls".
-_KANAAL_IN_TITEL = re.compile(r"#\s*([^\s()]+)")
+# Het stuk achter een # tot aan een komma, een haakje of een spatie.
+# De komma en de haakjes horen NIET bij de kanaalnaam.
+_KANAAL_IN_TITEL = re.compile(r"#\s*([^\s,()]+)")
+
+# Wat overblijft als je emoji en leestekens weghaalt: letters, cijfers,
+# streepje en liggend streepje.
+_ALLEEN_LETTERS = re.compile(r"[^0-9a-z\u00e0-\u00ff_-]+")
 
 
 def kanaal_uit_titel(titel: str) -> str:
-    """Geeft de kanaalnaam zonder # terug, of een lege tekst als er geen staat."""
+    """
+    Haalt de kanaalnaam uit de titel, zonder #, zonder emoji ervoor en zonder
+    komma erachter.
+
+        "KOOBY (#💵|algemene-chat, Algemeen)"  ->  "algemene-chat"
+        "#microcaps-calls (Test)"              ->  "microcaps-calls"
+        "Sander"                               ->  ""  (privébericht)
+    """
     treffer = _KANAAL_IN_TITEL.search(titel or "")
-    return treffer.group(1).strip().lower() if treffer else ""
+    if not treffer:
+        return ""
+    naam = treffer.group(1).strip()
+    # Discord zet soms een emoji vóór de naam, met een liggend streepje ertussen:
+    # "💵|algemene-chat". De echte naam staat achter het laatste streepje.
+    if "|" in naam:
+        naam = naam.rsplit("|", 1)[-1]
+    return naam.strip().strip(",.;:").lower()
+
+
+def vereenvoudig(naam: str) -> str:
+    """
+    Haalt emoji en leestekens uit een kanaalnaam, zodat "koffiehuis🔞" ook
+    matcht als jij gewoon "koffiehuis" in config.ini hebt getypt. Anders zou je
+    emoji moeten kunnen typen om je eigen kanaal op te geven.
+    """
+    return _ALLEEN_LETTERS.sub("", (naam or "").lower())
 
 
 def is_privebericht(titel: str, ondertitel: str = "") -> bool:
@@ -95,7 +130,12 @@ def kanaal_toegestaan(
         # hoeft niet. "calls" matcht exact het kanaal #calls, dus NIET
         # #calls-vip — dat is met opzet streng.
         naam = patroon.lstrip("#").strip().lower()
-        if naam and kanaal and kanaal == naam:
-            return True, f"kanaal #{naam}"
+        if not naam or not kanaal:
+            continue
+        if kanaal == naam:
+            return True, f"kanaal #{kanaal}"
+        # Tweede kans zonder emoji: "koffiehuis" matcht dan ook "koffiehuis🔞".
+        if vereenvoudig(kanaal) and vereenvoudig(kanaal) == vereenvoudig(naam):
+            return True, f"kanaal #{kanaal} (op naam zonder emoji)"
 
     return False, f"'{volledig}' staat niet in de kanaallijst"

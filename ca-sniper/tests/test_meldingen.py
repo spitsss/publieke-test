@@ -8,6 +8,8 @@ kunnen we de hele lezer testen zonder een Mac.
 Wat we hier NIET kunnen testen: of Apple de tabellen op jouw macOS-versie
 precies zo heeft. Daarvoor is 'python3 meldingen.py --diag' op de Mac zelf.
 """
+
+from __future__ import annotations  # nodig voor 'X | None' op Python 3.9
 import os
 import plistlib
 import sqlite3
@@ -34,14 +36,19 @@ def maak_database(pad: str, met_app_tabel: bool = True) -> None:
     verbinding.close()
 
 
-def voeg_melding_toe(pad: str, rec_id: int, app_id: int, titl: str, subt: str, body: str) -> None:
+def voeg_melding_toe(
+    pad: str, rec_id: int, app_id: int, titl: str, subt: str, body: str,
+    bezorgd: float | None = None,
+) -> None:
+    """'bezorgd' is Unix-tijd; standaard nu."""
     blob = plistlib.dumps(
         {"req": {"titl": titl, "subt": subt, "body": body}}, fmt=plistlib.FMT_BINARY
     )
+    wanneer = (bezorgd if bezorgd is not None else time.time()) - meldingen.APPLE_EPOCH_VERSCHIL
     verbinding = sqlite3.connect(pad)
     verbinding.execute(
         "insert into record (rec_id, app_id, data, delivered_date, presented) values (?,?,?,?,1)",
-        (rec_id, app_id, blob, time.time() - meldingen.APPLE_EPOCH_VERSCHIL),
+        (rec_id, app_id, blob, wanneer),
     )
     verbinding.commit()
     verbinding.close()
@@ -258,3 +265,95 @@ class TestHoofdlettersInBundelnaam(Basis):
         voeg_melding_toe(self.pad, 1, 2, "test", "", "niet van discord")
         lezer = meldingen.Meldingenlezer(self.pad, ["com.hnc.Discord"])
         self.assertEqual([], lezer.nieuwe_meldingen(0))
+
+
+class TestMeldingenGewist(Basis):
+    """
+    Wist de gebruiker zijn meldingen, dan gooit macOS oude rijen weg en begint
+    opnieuw te tellen. Het hoogste rec_id wordt dan LAGER dan wat de bot
+    onthouden had, en nieuwe calls komen binnen onder ons startpunt.
+
+    Zonder deze controle negeert de bot elke nieuwe call zonder één
+    foutmelding. Dit is op een echte Mac gebeurd: startpunt 1644, daarna
+    meldingen gewist, en de volgende melding kreeg nummer 1640.
+    """
+
+    def _wis(self, vanaf: int) -> None:
+        verbinding = sqlite3.connect(self.pad)
+        verbinding.execute("delete from record where rec_id >= ?", (vanaf,))
+        verbinding.commit()
+        verbinding.close()
+
+    def test_terugval_wordt_opgemerkt(self):
+        for rec_id in (1, 2, 3, 4, 5):
+            voeg_melding_toe(self.pad, rec_id, 1, "#calls (A)", "", f"oud {rec_id}")
+        lezer = meldingen.Meldingenlezer(self.pad, ["com.hnc.Discord"])
+        startpunt = lezer.hoogste_rec_id()
+        self.assertEqual(5, startpunt)
+
+        self._wis(3)  # de gebruiker klikt op 'Wis'
+        self.assertEqual(2, lezer.controleer_terugval(startpunt))
+
+    def test_zonder_terugval_geeft_hij_none(self):
+        for rec_id in (1, 2, 3):
+            voeg_melding_toe(self.pad, rec_id, 1, "#calls (A)", "", "x")
+        lezer = meldingen.Meldingenlezer(self.pad, ["com.hnc.Discord"])
+        self.assertIsNone(lezer.controleer_terugval(3))
+        self.assertIsNone(lezer.controleer_terugval(0))
+
+    def test_na_het_wissen_wordt_een_nieuwe_call_wel_gezien(self):
+        """
+        Dit is de hele reden dat de controle bestaat — en hier bleek het
+        nummer alleen NIET genoeg.
+
+        Als er ná het wissen al een call binnen is voordat de bot het merkt,
+        dan is het hoogste nummer precies die nieuwe call. Zou de bot zijn
+        startpunt op dat nummer zetten, dan slaat hij hem alsnog over. Daarom
+        valt hij terug op de BEZORGTIJD; die kan niet terugvallen.
+        """
+        nu = time.time()
+        for rec_id in (1, 2, 3, 4, 5):
+            voeg_melding_toe(
+                self.pad, rec_id, 1, "#calls (A)", "", f"oud {rec_id}", bezorgd=nu - 600
+            )
+        lezer = meldingen.Meldingenlezer(self.pad, ["com.hnc.Discord"])
+        startpunt = lezer.hoogste_rec_id()
+        startmoment = nu - 300  # de bot is 5 minuten geleden gestart
+
+        # De gebruiker wist zijn meldingen, en er komt meteen een nieuwe call.
+        self._wis(3)
+        voeg_melding_toe(self.pad, 3, 1, "#calls (A)", "", "NIEUWE CALL", bezorgd=nu)
+
+        # Op het NUMMER ziet de bot niets — dat is precies het probleem:
+        self.assertEqual([], lezer.nieuwe_meldingen(startpunt))
+
+        # De terugval wordt wel opgemerkt:
+        self.assertIsNotNone(lezer.controleer_terugval(startpunt))
+
+        # En op de BEZORGTIJD vindt hij de gemiste call alsnog, zonder de oude
+        # meldingen opnieuw op te pakken:
+        gemist = lezer.meldingen_na_tijd(startmoment)
+        self.assertEqual(["NIEUWE CALL"], [m.body for m in gemist])
+
+    def test_oude_meldingen_komen_niet_alsnog_terug(self):
+        """Het vangnet mag geen oude calls opnieuw gaan kopen."""
+        nu = time.time()
+        for rec_id in (1, 2, 3):
+            voeg_melding_toe(
+                self.pad, rec_id, 1, "#calls (A)", "", f"oud {rec_id}", bezorgd=nu - 3600
+            )
+        lezer = meldingen.Meldingenlezer(self.pad, ["com.hnc.Discord"])
+        self.assertEqual([], lezer.meldingen_na_tijd(nu - 60))
+
+    def test_vangnet_geeft_oudste_eerst(self):
+        nu = time.time()
+        voeg_melding_toe(self.pad, 1, 1, "#calls (A)", "", "eerst", bezorgd=nu - 20)
+        voeg_melding_toe(self.pad, 2, 1, "#calls (A)", "", "daarna", bezorgd=nu - 10)
+        lezer = meldingen.Meldingenlezer(self.pad, ["com.hnc.Discord"])
+        self.assertEqual(["eerst", "daarna"], [m.body for m in lezer.meldingen_na_tijd(nu - 60)])
+
+    def test_een_helemaal_lege_database(self):
+        voeg_melding_toe(self.pad, 1, 1, "#calls (A)", "", "x")
+        lezer = meldingen.Meldingenlezer(self.pad, ["com.hnc.Discord"])
+        self._wis(1)
+        self.assertEqual(0, lezer.controleer_terugval(1))

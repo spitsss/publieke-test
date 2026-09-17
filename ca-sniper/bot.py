@@ -50,6 +50,10 @@ class Sniper:
         self.werk: queue.Queue = queue.Queue(maxsize=100)
         self.stoppen = threading.Event()
         self.laatste_rec_id = 0
+        # Naast het nummer houden we de BEZORGTIJD bij van de laatste melding
+        # die we verwerkt hebben. Het nummer kan terugvallen als de gebruiker
+        # zijn meldingen wist; de tijd nooit. Dat is ons vangnet.
+        self.laatste_tijd = time.time()
         self.tellers = {"gezien": 0, "gefilterd": 0, "verstuurd": 0, "gekocht": 0, "mislukt": 0}
         self.laatste_ms = 0
 
@@ -151,6 +155,7 @@ class Sniper:
 
         wacht = opties.poll_ms / 1000
         laatste_hartslag = 0.0
+        laatste_terugvalcontrole = 0.0
 
         try:
             while not self.stoppen.is_set():
@@ -163,11 +168,50 @@ class Sniper:
 
                 for melding in nieuw:
                     self.laatste_rec_id = max(self.laatste_rec_id, melding.rec_id)
+                    self.laatste_tijd = max(self.laatste_tijd, melding.bezorgd_op or 0.0)
                     try:
                         self._bekijk(melding)
                     except Exception as fout:
                         # Eén rare melding mag de bot nooit omleggen.
                         self.log.exception("fout bij melding %s: %s", melding.rec_id, fout)
+
+                # Wist de gebruiker zijn meldingen, dan begint macOS opnieuw te
+                # tellen en komen nieuwe calls binnen ONDER ons startpunt. Die
+                # zou de bot allemaal negeren zonder een foutmelding. Elke vijf
+                # seconden dat er niets nieuws is, kijken we daarom of de
+                # nummering is terugverdwenen.
+                if not nieuw and time.time() - laatste_terugvalcontrole > 5:
+                    laatste_terugvalcontrole = time.time()
+                    try:
+                        terug = self.lezer.controleer_terugval(self.laatste_rec_id)
+                    except MeldingFout:
+                        terug = None
+                    if terug is not None:
+                        self.log.warning(
+                            "Het Berichtencentrum is opgeschoond: de nummering viel "
+                            "terug van %s naar %s. Ik val terug op de bezorgtijd, "
+                            "anders zou ik elke nieuwe call missen.",
+                            self.laatste_rec_id, terug,
+                        )
+                        # Er kan al een call binnen zijn met een LAGER nummer.
+                        # Die halen we op via de bezorgtijd, niet via het nummer.
+                        try:
+                            gemist = self.lezer.meldingen_na_tijd(self.laatste_tijd)
+                        except MeldingFout:
+                            gemist = []
+                        for melding in gemist:
+                            self.laatste_tijd = max(self.laatste_tijd, melding.bezorgd_op or 0.0)
+                            self.log.info(
+                                "melding %s alsnog opgepakt na het wissen", melding.rec_id
+                            )
+                            try:
+                                self._bekijk(melding)
+                            except Exception as fout:
+                                self.log.exception("fout bij melding %s: %s", melding.rec_id, fout)
+                        try:
+                            self.laatste_rec_id = self.lezer.hoogste_rec_id()
+                        except MeldingFout:
+                            self.laatste_rec_id = terug
 
                 if time.time() - laatste_hartslag > 2:
                     laatste_hartslag = time.time()
